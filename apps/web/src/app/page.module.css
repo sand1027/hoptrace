@@ -1,0 +1,59 @@
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.brand {
+  margin-bottom: 2rem;
+}
+
+.mark {
+  font-family: var(--font-plex-mono), var(--font-display);
+  font-size: clamp(2.4rem, 6vw, 3.6rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.tagline {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  max-width: 36rem;
+}
+
+.workspace {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.results {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.error {
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: #ffc9c9;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 0.9rem;
+}
+
+.empty {
+  border: 1px dashed var(--line);
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-family: var(--font-plex-mono), monospace;
+}
+
+@media (min-width: 900px) {
+  .workspace {
+    grid-template-columns: 340px 1fr;
+    align-items: start;
+  }
+}

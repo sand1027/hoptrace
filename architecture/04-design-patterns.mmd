@@ -1,0 +1,35 @@
+flowchart TB
+  subgraph creational [Creational]
+    Factory[Factory - NewAnalyzer / ExporterFactory]
+    Builder[Builder - ProbeRequestBuilder]
+    Singleton[Singleton - Logger / Config]
+  end
+
+  subgraph structural [Structural]
+    Adapter[Adapter - httptrace to Timing]
+    Decorator[Decorator - Trace / Log wrappers]
+    Facade[Facade - Analyzer]
+  end
+
+  subgraph behavioral [Behavioral]
+    Strategy[Strategy - DNS TLS Executor Exporter]
+    Command[Command - CLI cmds / API handlers]
+    Observer[Observer - probe phase events]
+    Template[Template Method - redirect loop]
+    NullObj[Null Object - NoopExporter / NoopSLO]
+  end
+
+  subgraph persistence [Persistence]
+    Repository[Repository - ProbeRepository]
+  end
+
+  Factory --> Facade
+  Builder --> Facade
+  Facade --> Strategy
+  Strategy --> Decorator
+  Decorator --> Adapter
+  Facade --> Template
+  Facade --> Observer
+  Command --> Facade
+  Facade --> NullObj
+  Facade --> Repository

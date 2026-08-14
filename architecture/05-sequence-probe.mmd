@@ -1,0 +1,23 @@
+sequenceDiagram
+  participant UI as Next_or_CLI
+  participant API as API_or_CLI_main
+  participant A as Analyzer_Facade
+  participant D as DNS_Strategy
+  participant E as Executor_Decorated
+  participant S as SLO_Evaluator
+  participant R as Repository
+
+  UI->>API: ProbeRequest
+  API->>A: Analyze(ctx, req)
+  A->>D: Resolve(host)
+  D-->>A: IP, dns_ms
+  A->>E: Do(req)
+  Note over E: httptrace: connect, tls, ttfb, xfer
+  E-->>A: StepResult
+  A->>S: Evaluate(thresholds)
+  S-->>A: pass_or_violations
+  opt history_enabled
+    A->>R: Save(report)
+  end
+  A-->>API: ProbeReport JSON
+  API-->>UI: waterfall payload

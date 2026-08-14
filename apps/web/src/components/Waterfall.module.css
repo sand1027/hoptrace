@@ -1,0 +1,106 @@
+.wrap {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  padding: 1rem 1.1rem 1.25rem;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: var(--font-plex-mono), monospace;
+  font-weight: 500;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-family: var(--font-plex-mono), monospace;
+}
+
+.legendItem i {
+  width: 0.65rem;
+  height: 0.65rem;
+  display: inline-block;
+}
+
+.steps {
+  display: grid;
+  gap: 1rem;
+}
+
+.step {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.stepHead {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 0.8rem;
+}
+
+.stepNum {
+  color: var(--accent);
+}
+
+.status {
+  color: var(--warn);
+}
+
+.url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.total {
+  color: var(--muted);
+}
+
+.track {
+  display: flex;
+  height: 18px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+
+.seg {
+  height: 100%;
+  min-width: 0;
+  transition: width 400ms ease;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+}

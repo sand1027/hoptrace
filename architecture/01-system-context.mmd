@@ -1,0 +1,36 @@
+flowchart TB
+  subgraph clients [Clients]
+    CLI[Go CLI]
+    Web[Next.js Web UI]
+  end
+
+  subgraph apps [Apps]
+    API[Go API Server]
+  end
+
+  subgraph core [Shared Core - internal/probe]
+    Analyzer[Analyzer]
+    DNS[DNSResolver Strategy]
+    TLS[TLSInspector Strategy]
+    Exec[RequestExecutor Strategy]
+    Trace[httptrace Timing]
+    SLO[SLO Evaluator]
+    Export[Exporter Strategy]
+  end
+
+  subgraph store [Persistence]
+    Repo[ProbeRepository]
+    SQLite[(SQLite / Postgres)]
+  end
+
+  CLI --> Analyzer
+  Web -->|REST / JSON| API
+  API --> Analyzer
+  Analyzer --> DNS
+  Analyzer --> TLS
+  Analyzer --> Exec
+  Analyzer --> Trace
+  Analyzer --> SLO
+  Analyzer --> Export
+  API --> Repo
+  Repo --> SQLite

@@ -1,0 +1,15 @@
+{
+  "name": "hoptrace",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web": "pnpm --filter @hoptrace/web dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "architecture": "node scripts/render-architecture.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  }
+}

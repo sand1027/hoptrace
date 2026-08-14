@@ -1,0 +1,45 @@
+flowchart TB
+  subgraph monorepo [http-cli monorepo]
+    subgraph webApp [apps/web]
+      Next[Next.js App Router]
+    end
+
+    subgraph apiApp [apps/api]
+      Chi[Chi HTTP Server]
+      SSRF[SSRF Guard Middleware]
+      Handlers[Probe Handlers]
+    end
+
+    subgraph cliApp [apps/cli]
+      Cobra[Cobra CLI]
+      Cmds[probe / history commands]
+    end
+
+    subgraph shared [internal]
+      Probe[probe Facade]
+      DNSPkg[dns Strategy]
+      TLSPkg[tlsinfo Strategy]
+      ExecPkg[executor + httptrace]
+      SLOPkg[slo]
+      ExportPkg[export]
+      RepoPkg[repository]
+      Platform[platform config/logging]
+    end
+
+    subgraph pkgs [packages]
+      Types[shared-types OpenAPI TS]
+    end
+  end
+
+  User[User] --> Next
+  User --> Cobra
+  Next -->|/api proxy| Chi
+  Chi --> SSRF --> Handlers --> Probe
+  Cobra --> Cmds --> Probe
+  Probe --> DNSPkg
+  Probe --> TLSPkg
+  Probe --> ExecPkg
+  Probe --> SLOPkg
+  Probe --> ExportPkg
+  Handlers --> RepoPkg
+  Next --> Types

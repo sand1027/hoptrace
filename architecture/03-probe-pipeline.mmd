@@ -1,0 +1,32 @@
+flowchart LR
+  subgraph build [Builder]
+    Req[ProbeRequest]
+  end
+
+  subgraph facade [Facade]
+    A[Analyzer]
+  end
+
+  subgraph strategies [Strategies]
+    DNS[DNSResolver]
+    TLS[TLSInspector]
+    EX[RequestExecutor]
+  end
+
+  subgraph decorators [Decorators]
+    TR[TraceDecorator]
+    LG[LogDecorator]
+  end
+
+  subgraph after [Post-process]
+    SLO[SLO Strategy]
+    EXP[Exporter Strategy]
+  end
+
+  Req --> A
+  A --> DNS
+  A --> EX
+  EX --> TR
+  TR --> TLS
+  A --> SLO
+  A --> EXP

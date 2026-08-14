@@ -1,0 +1,79 @@
+.panel {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  display: grid;
+  gap: 0.2rem;
+  font-family: var(--font-plex-mono), monospace;
+}
+
+.stat span {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat strong {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.details {
+  display: grid;
+  gap: 0.45rem;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 0.82rem;
+}
+
+.details > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 0.5rem;
+}
+
+.k {
+  color: var(--muted);
+}
+
+.sloPass code {
+  color: var(--accent);
+}
+
+.sloFail code {
+  color: var(--danger);
+}
+
+.download {
+  justify-self: start;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 0.8rem;
+}
+
+.download:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+@media (max-width: 700px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
