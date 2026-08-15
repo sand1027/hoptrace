@@ -9,12 +9,18 @@ import (
 
 // Analyzer is the Facade over DNS, executor, SLO, export, and redirect flow.
 type Analyzer struct {
-	DNS      DNSResolver
-	Executor RequestExecutor
-	SLO      *SLOEvaluator
-	Events   EventListener
+	DNS       DNSResolver
+	Executor  RequestExecutor
+	SLO       *SLOEvaluator
+	Events    EventListener
+	Validator URLValidator // optional; re-checked on every redirect hop
 	// Listener is legacy; prefer Events. Kept for WithListener.
 	Listener PhaseListener
+}
+
+// URLValidator blocks unsafe targets (SSRF) — Strategy.
+type URLValidator interface {
+	ValidateURL(raw string) error
 }
 
 // Option configures an Analyzer (functional options + Factory).
@@ -34,6 +40,10 @@ func WithListener(l PhaseListener) Option {
 
 func WithEvents(l EventListener) Option {
 	return func(a *Analyzer) { a.Events = l }
+}
+
+func WithURLValidator(v URLValidator) Option {
+	return func(a *Analyzer) { a.Validator = v }
 }
 
 // NewAnalyzer constructs a configured Analyzer (Factory).
@@ -87,6 +97,17 @@ func (a *Analyzer) Analyze(ctx context.Context, req ProbeRequest) (ProbeReport, 
 
 	var lastErr error
 	for hop := 1; hop <= maxHops; hop++ {
+		if a.Validator != nil {
+			if err := a.Validator.ValidateURL(currentURL); err != nil {
+				msg := err.Error()
+				step := StepResult{URL: currentURL, StepNumber: hop, Error: &msg}
+				report.Steps = append(report.Steps, step)
+				lastErr = err
+				a.emit(Event{Kind: "error", Step: hop, URL: currentURL, Error: msg})
+				break
+			}
+		}
+
 		stepReq := req
 		stepReq.Method = method
 		stepReq.Body = body
@@ -132,8 +153,33 @@ func errString(err error) string {
 }
 
 func (a *Analyzer) doStep(ctx context.Context, req ProbeRequest, targetURL string, stepNum int) (StepResult, error) {
+	var preDNSMS float64
+	var preIP, preFamily string
+	if a.DNS != nil {
+		if u, err := url.Parse(targetURL); err == nil && u.Hostname() != "" {
+			port := u.Port()
+			if port == "" {
+				if u.Scheme == "https" {
+					port = "443"
+				} else {
+					port = "80"
+				}
+			}
+			if ip, family, ms, err := a.DNS.Resolve(ctx, u.Hostname(), port); err == nil {
+				preDNSMS, preIP, preFamily = ms, ip, family
+			}
+		}
+	}
+
 	step, err := a.Executor.Execute(ctx, req, targetURL)
 	step.StepNumber = stepNum
+	if step.Timing.DNSMS == 0 && preDNSMS > 0 {
+		step.Timing.DNSMS = preDNSMS
+	}
+	if step.Network.IP == "" && preIP != "" {
+		step.Network.IP = preIP
+		step.Network.IPFamily = preFamily
+	}
 	for _, p := range []struct {
 		name string
 		ms   float64

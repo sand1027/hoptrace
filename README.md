@@ -2,12 +2,24 @@
 
 HTTP latency profiler — break every request into **DNS → Connect → TLS → Wait → Transfer**.
 
+**Full feature guide (every command, flag, diagram):** **[GUIDE.md](GUIDE.md)**
+
 | Surface | Use |
 |---------|-----|
 | **CLI** | Fast local probes (`hoptrace <url>`) |
 | **Dashboard** | Compose/send requests, waterfall, history, library, share links |
 
 **Local store: SQLite** (`~/.hoptrace/history.db`). No Postgres, Docker, or API keys required to try it.
+
+```mermaid
+flowchart LR
+  CLI[hoptrace CLI] --> DB[(SQLite)]
+  CLI --> Target[HTTP target]
+  CLI -.->|schedule / keys / baseline| API[API :8080]
+  WEB[Dashboard :3000] --> API
+  API --> DB
+  API --> Target
+```
 
 ## Clone and run (local dashboard)
 
@@ -40,19 +52,26 @@ Shell completions: `hoptrace completion zsh` (also bash/fish/powershell).
 
 Tagged releases (`v*`) publish cross-compiled binaries via GitHub Actions. Locally: `make release` → `dist/`.
 
-## CLI
+## CLI (highlights)
 
 ```bash
 hoptrace 'https://httpbin.io/get'
 hoptrace save demo https://httpbin.io/get
 hoptrace run demo
 hoptrace history
-hoptrace dashboard          # opens http://127.0.0.1:3000
+hoptrace history compare <id-a> <id-b>
+hoptrace schedule add uptime https://httpbin.io/get --every 60
+hoptrace keys create ci
+hoptrace baseline 'https://httpbin.io/get'
+hoptrace dashboard
 hoptrace --slo total=500 'https://httpbin.io/get'
+hoptrace --max-body 1048576 'https://example.com/'
 ```
 
 TTY waterfall uses color phase bars (auto on interactive terminals).  
 Force on: `HOPTRACE_COLOR=1` · force off: `NO_COLOR=1`. Add `-v` for probe debug logs.
+
+Single-tenant local tool: one SQLite DB per machine (see [SECURITY.md](SECURITY.md)).
 
 ### Exit codes (scripting)
 
@@ -84,6 +103,7 @@ CI runs both on every PR (`.github/workflows/ci.yml`).
 
 ## Docs
 
+- **[GUIDE.md](GUIDE.md)** — complete CLI & feature guide (with Mermaid)
 - [architecture/](architecture/) — diagrams
 - [docs/patterns/](docs/patterns/) — design patterns
 - [openapi.yaml](openapi.yaml) — API contract

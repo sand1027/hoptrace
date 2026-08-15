@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -16,85 +15,7 @@ import (
 	"github.com/sandeepv/hoptrace/internal/repository"
 	"github.com/sandeepv/hoptrace/internal/setup"
 	"github.com/sandeepv/hoptrace/internal/slo"
-	"github.com/sandeepv/hoptrace/internal/version"
 )
-
-func main() {
-	var f probeFlags
-	verbose := false
-
-	// Quiet by default so the waterfall stays readable.
-	platform.SetLogLevel(slog.LevelWarn)
-	if os.Getenv("HOPTRACE_VERBOSE") == "1" {
-		platform.SetLogLevel(slog.LevelInfo)
-	}
-
-	root := &cobra.Command{
-		Use:   "hoptrace [url]",
-		Short: "HTTP latency profiler — DNS, connect, TLS, wait, transfer",
-		Long: `hoptrace probes a URL and breaks timing into DNS, connect, TLS, wait, and transfer.
-
-Examples:
-  hoptrace https://example.com
-  hoptrace save stance-patients 'https://dashboard.stance.health/patients'
-  hoptrace run stance-patients
-  hoptrace saved list
-  hoptrace history`,
-		Args: cobra.MaximumNArgs(1),
-		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-			if verbose {
-				platform.SetLogLevel(slog.LevelInfo)
-			}
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
-			}
-			f.proxySet = cmd.Flags().Changed("proxy")
-			return runProbe(cmd, args[0], f)
-		},
-	}
-
-	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show probe debug logs on stderr")
-	bindProbeFlags(root, &f)
-
-	root.AddCommand(&cobra.Command{
-		Use:   "version",
-		Short: "Print version",
-		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintln(cmd.OutOrStdout(), "hoptrace", version.Version)
-		},
-	})
-	root.AddCommand(newCompletionCmd())
-
-	probeCmd := &cobra.Command{
-		Use:   "probe [url]",
-		Short: "Alias for probing a URL",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			f.proxySet = cmd.Flags().Changed("proxy")
-			return runProbe(cmd, args[0], f)
-		},
-	}
-	bindProbeFlags(probeCmd, &f)
-	root.AddCommand(probeCmd)
-	root.AddCommand(newHistoryCmd())
-	root.AddCommand(newSaveCmd(&f))
-	root.AddCommand(newRunCmd(&f))
-	root.AddCommand(newSavedCmd())
-	root.AddCommand(newScheduleCmd())
-	root.AddCommand(newKeysCmd())
-	root.AddCommand(newBaselineCmd())
-	root.AddCommand(newDashboardCmd())
-
-	root.SilenceUsage = true
-	if err := root.Execute(); err != nil {
-		if _, ok := err.(*platform.UsageError); ok {
-			os.Exit(platform.ExitUsage)
-		}
-		os.Exit(platform.ExitSoftware)
-	}
-}
 
 func bindProbeFlags(cmd *cobra.Command, f *probeFlags) {
 	cmd.Flags().StringVarP(&f.method, "method", "X", "", "HTTP method")
@@ -110,6 +31,7 @@ func bindProbeFlags(cmd *cobra.Command, f *probeFlags) {
 	cmd.Flags().StringVar(&f.jsonPath, "json", "", "Write JSON report to path")
 	cmd.Flags().StringVar(&f.sloSpec, "slo", "", "SLO thresholds e.g. total=500,ttfb=200")
 	cmd.Flags().BoolVar(&f.noSave, "no-save", false, "Do not persist this run to history")
+	cmd.Flags().Int64Var(&f.maxBody, "max-body", 10<<20, "Max response body bytes to read")
 }
 
 type probeFlags struct {
@@ -118,6 +40,7 @@ type probeFlags struct {
 	follow, ignoreSSL, compact, metricsOnly        bool
 	timeoutSec                                     float64
 	proxySet, noSave                               bool
+	maxBody                                        int64
 }
 
 func runProbe(cmd *cobra.Command, rawURL string, f probeFlags) error {
@@ -140,7 +63,9 @@ func runProbe(cmd *cobra.Command, rawURL string, f probeFlags) error {
 		b.Body(body)
 	}
 	b.FollowRedirect(f.follow)
-	b.Timeout(time.Duration(f.timeoutSec * float64(time.Second)))
+	if f.timeoutSec > 0 {
+		b.Timeout(time.Duration(f.timeoutSec * float64(time.Second)))
+	}
 	if f.ignoreSSL {
 		b.IgnoreSSL(true)
 	}
@@ -156,6 +81,9 @@ func runProbe(cmd *cobra.Command, rawURL string, f probeFlags) error {
 			return usage("%v", err)
 		}
 		b.SLO(thresholds)
+	}
+	if f.maxBody > 0 {
+		b.MaxBodyBytes(f.maxBody)
 	}
 
 	req, err := b.Build()
@@ -198,11 +126,11 @@ func runProbe(cmd *cobra.Command, rawURL string, f probeFlags) error {
 
 	if probeErr != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "error: %v\n", probeErr)
-		os.Exit(platform.ExitTempFail)
+		return platform.NewExitError(platform.ExitTempFail, probeErr)
 	}
 	if report.Summary.SLO != nil && !report.Summary.SLO.Pass {
 		fmt.Fprintf(cmd.ErrOrStderr(), "slo failed (exit %d)\n", platform.ExitSLOFail)
-		os.Exit(platform.ExitSLOFail)
+		return platform.NewExitError(platform.ExitSLOFail, fmt.Errorf("slo failed"))
 	}
 	return nil
 }
@@ -489,7 +417,6 @@ func openHistory() (*repository.SQLiteRepository, error) {
 func usage(format string, args ...any) error {
 	err := platform.NewUsageError(format, args...)
 	fmt.Fprintln(os.Stderr, err.Error())
-	os.Exit(platform.ExitUsage)
 	return err
 }
 
