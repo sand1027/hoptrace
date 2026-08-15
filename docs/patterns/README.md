@@ -10,6 +10,10 @@ These short notes map GoF-style patterns to real packages in this repo.
 | [03-factory](03-factory.md) | Factory | `setup.DefaultAnalyzer`, `export.Factory` |
 | [04-decorator](04-decorator.md) | Decorator | `executor.LoggingExecutor` |
 | [05-repository-adapter-null](05-repository-adapter-null.md) | Repository / Adapter / Null Object | `repository`, timing adapters |
+| [06-repository-sqlite](06-repository-sqlite.md) | Repository + SQLite Adapter (v2) | `SQLiteRepository`, shared history DB |
+| [07-command-factory](07-command-factory.md) | Command + Factory (v3) | Cobra commands, `DefaultAnalyzer`, exporters |
+| [08-observer-live](08-observer-live.md) | Observer + live stream (v4) | `EventListener`, WebSocket, compare |
+| [09-v5-v9](09-v5-v9.md) | Schedules → Scale (v5–v9) | Worker, auth, notify, plugins, Postgres, rate limits |
 
 Also used lightly:
 
