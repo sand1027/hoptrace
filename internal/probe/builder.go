@@ -21,6 +21,7 @@ func NewRequestBuilder() *RequestBuilder {
 			Headers:      map[string]string{},
 			Timeout:      30 * time.Second,
 			MaxRedirects: 10,
+			MaxBodyBytes: 10 << 20,
 			SLO:          map[string]float64{},
 		},
 	}
@@ -129,6 +130,16 @@ func (b *RequestBuilder) CABundle(path string) *RequestBuilder {
 func (b *RequestBuilder) MaxRedirects(n int) *RequestBuilder {
 	if n > 0 {
 		b.req.MaxRedirects = n
+	}
+	return b
+}
+
+func (b *RequestBuilder) MaxBodyBytes(n int64) *RequestBuilder {
+	if b.err != nil {
+		return b
+	}
+	if n > 0 {
+		b.req.MaxBodyBytes = n
 	}
 	return b
 }

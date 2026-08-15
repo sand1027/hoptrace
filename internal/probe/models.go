@@ -14,6 +14,7 @@ type ProbeRequest struct {
 	IgnoreSSL      bool
 	CABundlePath   string
 	MaxRedirects   int
+	MaxBodyBytes   int64 // 0 = default (10 MiB)
 	SLO            map[string]float64 // phase -> threshold ms
 }
 

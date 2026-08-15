@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -70,65 +71,7 @@ func main() {
 	worker.Start(ctx)
 	defer worker.Stop()
 
-	r := chi.NewRouter()
-	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
-	r.Use(chimw.Logger)
-	r.Use(chimw.Recoverer)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3000", "http://127.0.0.1:3000"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-API-Key"},
-		MaxAge:         300,
-	}))
-
-	r.Get("/v1/health", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"status":  "ok",
-			"store":   "sqlite",
-			"db":      path,
-			"version": "v9",
-		})
-	})
-	r.Get("/v1/share/{token}", api.getShare) // public
-
-	r.Route("/v1", func(r chi.Router) {
-		r.Use(auth.Middleware(repo, *requireAuth))
-		r.Use(ratelimit.Middleware(api.limiter, func(req *http.Request) string {
-			return auth.WorkspaceID(req.Context())
-		}))
-
-		r.With(chimw.Timeout(60*time.Second)).Post("/probes", api.createProbe)
-		r.With(chimw.Timeout(15*time.Second)).Get("/probes", api.listProbes)
-		r.Get("/probes/stream", api.streamProbe)
-		r.With(chimw.Timeout(15*time.Second)).Get("/probes/{id}", api.getProbe)
-		r.With(chimw.Timeout(15*time.Second)).Post("/probes/{id}/share", api.createShare)
-
-		r.With(chimw.Timeout(15 * time.Second)).Route("/saved", func(r chi.Router) {
-			r.Get("/", api.listSaved)
-			r.Post("/", api.upsertSaved)
-			r.Get("/{name}", api.getSaved)
-			r.Put("/{name}", api.upsertSavedNamed)
-			r.Delete("/{name}", api.deleteSaved)
-			r.Post("/{name}/run", api.runSaved)
-		})
-
-		r.With(chimw.Timeout(15 * time.Second)).Route("/schedules", func(r chi.Router) {
-			r.Get("/", api.listSchedules)
-			r.Post("/", api.upsertSchedule)
-			r.Get("/{id}", api.getSchedule)
-			r.Delete("/{id}", api.deleteSchedule)
-		})
-
-		r.With(chimw.Timeout(15*time.Second)).Get("/baselines", api.baselines)
-		r.With(chimw.Timeout(15*time.Second)).Get("/failures", api.listFailures)
-
-		r.With(chimw.Timeout(15 * time.Second)).Route("/keys", func(r chi.Router) {
-			r.Get("/", api.listKeys)
-			r.Post("/", api.createKey)
-			r.Delete("/{id}", api.deleteKey)
-		})
-	})
+	r := api.routes(*requireAuth, path)
 
 	srv := &http.Server{Addr: *addr, Handler: r}
 	go func() {
@@ -153,6 +96,72 @@ type server struct {
 	guard   *ssrf.Guard
 	logger  platformLogger
 	limiter *ratelimit.Limiter
+}
+
+func (s *server) analyzer(opts ...probe.Option) *probe.Analyzer {
+	return setup.AnalyzerWithGuard(s.guard, opts...)
+}
+
+func (s *server) routes(requireAuth bool, dbPath string) http.Handler {
+	r := chi.NewRouter()
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"http://localhost:3000", "http://127.0.0.1:3000"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-API-Key"},
+		MaxAge:         300,
+	}))
+
+	r.Get("/v1/health", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "ok",
+			"store":   "sqlite",
+			"db":      dbPath,
+			"version": "v9",
+		})
+	})
+	r.Get("/v1/share/{token}", s.getShare) // public
+
+	r.Route("/v1", func(r chi.Router) {
+		r.Use(auth.Middleware(s.repo, requireAuth))
+		r.Use(ratelimit.Middleware(s.limiter, func(req *http.Request) string {
+			return auth.WorkspaceID(req.Context())
+		}))
+
+		r.With(chimw.Timeout(60*time.Second)).Post("/probes", s.createProbe)
+		r.With(chimw.Timeout(15*time.Second)).Get("/probes", s.listProbes)
+		r.Get("/probes/stream", s.streamProbe)
+		r.With(chimw.Timeout(15*time.Second)).Get("/probes/{id}", s.getProbe)
+		r.With(chimw.Timeout(15*time.Second)).Post("/probes/{id}/share", s.createShare)
+
+		r.With(chimw.Timeout(15 * time.Second)).Route("/saved", func(r chi.Router) {
+			r.Get("/", s.listSaved)
+			r.Post("/", s.upsertSaved)
+			r.Get("/{name}", s.getSaved)
+			r.Put("/{name}", s.upsertSavedNamed)
+			r.Delete("/{name}", s.deleteSaved)
+			r.Post("/{name}/run", s.runSaved)
+		})
+
+		r.With(chimw.Timeout(15 * time.Second)).Route("/schedules", func(r chi.Router) {
+			r.Get("/", s.listSchedules)
+			r.Post("/", s.upsertSchedule)
+			r.Get("/{id}", s.getSchedule)
+			r.Delete("/{id}", s.deleteSchedule)
+		})
+
+		r.With(chimw.Timeout(15*time.Second)).Get("/baselines", s.baselines)
+		r.With(chimw.Timeout(15*time.Second)).Get("/failures", s.listFailures)
+
+		r.With(chimw.Timeout(15 * time.Second)).Route("/keys", func(r chi.Router) {
+			r.Get("/", s.listKeys)
+			r.Post("/", s.createKey)
+			r.Delete("/{id}", s.deleteKey)
+		})
+	})
+	return r
 }
 
 // thin alias so we don't fight slog types in struct
@@ -197,7 +206,7 @@ func (s *server) createProbe(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 		return
 	}
-	report, probeErr := setup.DefaultAnalyzer().Analyze(r.Context(), req)
+	report, probeErr := s.analyzer().Analyze(r.Context(), req)
 	rec, _ := s.repo.Save(r.Context(), report)
 	s.maybeAlert(r.Context(), "probe", body, report, probeErr)
 	status := http.StatusOK
@@ -268,7 +277,7 @@ func (s *server) streamProbe(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-	report, probeErr := setup.DefaultAnalyzer(probe.WithEvents(listener)).Analyze(r.Context(), req)
+	report, probeErr := s.analyzer(probe.WithEvents(listener)).Analyze(r.Context(), req)
 	rec, _ := s.repo.Save(r.Context(), report)
 	listener.Close()
 	<-done
@@ -351,7 +360,7 @@ func (s *server) runSaved(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 		return
 	}
-	report, probeErr := setup.DefaultAnalyzer().Analyze(r.Context(), req)
+	report, probeErr := s.analyzer().Analyze(r.Context(), req)
 	rec, _ := s.repo.Save(r.Context(), report)
 	s.maybeAlert(r.Context(), "saved:"+sp.Name, body, report, probeErr)
 	status := http.StatusOK
@@ -386,6 +395,20 @@ func (s *server) upsertSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	job.WorkspaceID = auth.WorkspaceID(r.Context())
+	if job.URL != "" {
+		if err := s.guard.ValidateURL(job.URL); err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+			return
+		}
+	}
+	if err := s.validateWebhook(job.WebhookURL); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "webhook_url: " + err.Error()})
+		return
+	}
+	if err := s.validateWebhook(job.SlackWebhook); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "slack_webhook: " + err.Error()})
+		return
+	}
 	out, err := s.repo.UpsertJob(r.Context(), job)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -535,7 +558,7 @@ func (s *server) runJob(ctx context.Context, job schedule.Job) (probe.ProbeRepor
 	if err := s.guard.ValidateURL(req.URL); err != nil {
 		return probe.ProbeReport{}, err
 	}
-	report, runErr := setup.DefaultAnalyzer().Analyze(ctx, req)
+	report, runErr := s.analyzer().Analyze(ctx, req)
 	_, _ = s.repo.Save(ctx, report)
 	return report, runErr
 }
@@ -545,6 +568,13 @@ func (s *server) onScheduleComplete(ctx context.Context, job schedule.Job, repor
 	s.maybeAlert(ctx, "schedule:"+job.Name, body, report, err)
 }
 
+func (s *server) validateWebhook(raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	return s.guard.ValidateURL(raw)
+}
+
 func (s *server) maybeAlert(ctx context.Context, title string, body probeAPIRequest, report probe.ProbeReport, runErr error) {
 	ev, ok := notify.FromReport(title, report, runErr)
 	if !ok {
@@ -552,10 +582,25 @@ func (s *server) maybeAlert(ctx context.Context, title string, body probeAPIRequ
 	}
 	ws := auth.WorkspaceID(ctx)
 	_ = s.repo.RecordFailure(ctx, ws, ev.Title, ev.Message, ev.URL, ev.Status, ev.TotalMS)
-	n := notify.MultiNotifier{Items: []notify.Notifier{
-		notify.WebhookNotifier{URL: body.WebhookURL},
-		notify.SlackNotifier{WebhookURL: body.SlackWebhook},
-	}}
+	items := []notify.Notifier{}
+	if body.WebhookURL != "" {
+		if err := s.validateWebhook(body.WebhookURL); err != nil {
+			s.logger.Warn("blocked webhook url", "err", err)
+		} else {
+			items = append(items, notify.WebhookNotifier{URL: body.WebhookURL})
+		}
+	}
+	if body.SlackWebhook != "" {
+		if err := s.validateWebhook(body.SlackWebhook); err != nil {
+			s.logger.Warn("blocked slack webhook", "err", err)
+		} else {
+			items = append(items, notify.SlackNotifier{WebhookURL: body.SlackWebhook})
+		}
+	}
+	if len(items) == 0 {
+		return
+	}
+	n := notify.MultiNotifier{Items: items}
 	if err := n.Notify(ctx, ev); err != nil {
 		s.logger.Warn("notify failed", "err", err)
 	}

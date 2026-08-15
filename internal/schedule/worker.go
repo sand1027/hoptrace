@@ -9,6 +9,11 @@ import (
 	"github.com/sandeepv/hoptrace/internal/probe"
 )
 
+const (
+	DefaultMaxInFlight = 4
+	MinIntervalSec     = 5
+)
+
 // Job is a recurring probe definition.
 type Job struct {
 	ID              string             `json:"id"`
@@ -49,34 +54,48 @@ type Store interface {
 	TouchJob(ctx context.Context, id string, status int, totalMS float64, errMsg string) error
 }
 
-// Worker runs enabled jobs on an interval (Template Method: tick → due → run → persist → notify).
+// Worker runs enabled jobs on an interval with bounded concurrency + per-job lease.
 type Worker struct {
-	Store      Store
-	Run        Runner
-	OnComplete OnComplete
-	Logger     *slog.Logger
-	TickEvery  time.Duration
+	Store       Store
+	Run         Runner
+	OnComplete  OnComplete
+	Logger      *slog.Logger
+	TickEvery   time.Duration
+	MaxInFlight int
 
 	mu       sync.Mutex
 	lastFire map[string]time.Time
+	active   map[string]struct{}
+	sem      chan struct{}
 	stop     chan struct{}
+	wg       sync.WaitGroup
 }
 
 func NewWorker(store Store, run Runner, log *slog.Logger) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
+	max := DefaultMaxInFlight
 	return &Worker{
-		Store:     store,
-		Run:       run,
-		Logger:    log,
-		TickEvery: 5 * time.Second,
-		lastFire:  map[string]time.Time{},
-		stop:      make(chan struct{}),
+		Store:       store,
+		Run:         run,
+		Logger:      log,
+		TickEvery:   5 * time.Second,
+		MaxInFlight: max,
+		lastFire:    map[string]time.Time{},
+		active:      map[string]struct{}{},
+		sem:         make(chan struct{}, max),
+		stop:        make(chan struct{}),
 	}
 }
 
 func (w *Worker) Start(ctx context.Context) {
+	if w.MaxInFlight <= 0 {
+		w.MaxInFlight = DefaultMaxInFlight
+	}
+	if cap(w.sem) != w.MaxInFlight {
+		w.sem = make(chan struct{}, w.MaxInFlight)
+	}
 	go w.loop(ctx)
 }
 
@@ -86,6 +105,7 @@ func (w *Worker) Stop() {
 	default:
 		close(w.stop)
 	}
+	w.wg.Wait()
 }
 
 func (w *Worker) loop(ctx context.Context) {
@@ -111,22 +131,56 @@ func (w *Worker) tick(ctx context.Context) {
 	}
 	now := time.Now()
 	for _, job := range jobs {
-		if !job.Enabled || job.IntervalSec <= 0 {
+		if !job.Enabled {
 			continue
 		}
+		interval := job.IntervalSec
+		if interval < MinIntervalSec {
+			interval = MinIntervalSec
+		}
 		w.mu.Lock()
+		_, running := w.active[job.ID]
 		last := w.lastFire[job.ID]
 		w.mu.Unlock()
-		if !last.IsZero() && now.Sub(last) < time.Duration(job.IntervalSec)*time.Second {
+		if running {
 			continue
 		}
-		if job.LastRunAt != nil && now.Sub(*job.LastRunAt) < time.Duration(job.IntervalSec)*time.Second {
+		if !last.IsZero() && now.Sub(last) < time.Duration(interval)*time.Second {
 			continue
 		}
+		if job.LastRunAt != nil && now.Sub(*job.LastRunAt) < time.Duration(interval)*time.Second {
+			continue
+		}
+
+		select {
+		case w.sem <- struct{}{}:
+		default:
+			// at global concurrency cap — skip until next tick
+			continue
+		}
+
 		w.mu.Lock()
+		if _, running := w.active[job.ID]; running {
+			w.mu.Unlock()
+			<-w.sem
+			continue
+		}
+		w.active[job.ID] = struct{}{}
 		w.lastFire[job.ID] = now
 		w.mu.Unlock()
-		go w.execute(ctx, job)
+
+		job := job
+		w.wg.Add(1)
+		go func() {
+			defer w.wg.Done()
+			defer func() { <-w.sem }()
+			defer func() {
+				w.mu.Lock()
+				delete(w.active, job.ID)
+				w.mu.Unlock()
+			}()
+			w.execute(ctx, job)
+		}()
 	}
 }
 
@@ -151,14 +205,14 @@ func (w *Worker) execute(ctx context.Context, job Job) {
 
 // BaselineStats holds percentile stats for an URL.
 type BaselineStats struct {
-	URL      string  `json:"url"`
-	Count    int     `json:"count"`
-	P50MS    float64 `json:"p50_ms"`
-	P95MS    float64 `json:"p95_ms"`
-	MeanMS   float64 `json:"mean_ms"`
-	LastMS   float64 `json:"last_ms"`
-	Regressed bool  `json:"regressed"`
-	Message  string  `json:"message,omitempty"`
+	URL       string  `json:"url"`
+	Count     int     `json:"count"`
+	P50MS     float64 `json:"p50_ms"`
+	P95MS     float64 `json:"p95_ms"`
+	MeanMS    float64 `json:"mean_ms"`
+	LastMS    float64 `json:"last_ms"`
+	Regressed bool    `json:"regressed"`
+	Message   string  `json:"message,omitempty"`
 }
 
 // ComputeBaseline from recent total_ms samples (sorted ascending expected).
@@ -167,7 +221,6 @@ func ComputeBaseline(url string, samples []float64) BaselineStats {
 	if len(samples) == 0 {
 		return out
 	}
-	// copy + sort
 	xs := append([]float64(nil), samples...)
 	for i := 0; i < len(xs); i++ {
 		for j := i + 1; j < len(xs); j++ {
@@ -183,7 +236,7 @@ func ComputeBaseline(url string, samples []float64) BaselineStats {
 	out.MeanMS = sum / float64(len(xs))
 	out.P50MS = percentile(xs, 50)
 	out.P95MS = percentile(xs, 95)
-	out.LastMS = samples[0] // caller should pass newest-first
+	out.LastMS = samples[0]
 	if out.LastMS > out.P95MS && len(xs) >= 5 {
 		out.Regressed = true
 		out.Message = "last run above p95 baseline"

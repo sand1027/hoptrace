@@ -140,11 +140,16 @@ func (e *HTTPExecutor) execute(ctx context.Context, req probe.ProbeRequest, targ
 	}
 	defer resp.Body.Close()
 
-	body, readErr := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes(req)+1))
 	end := time.Now()
 	if readErr != nil {
 		msg := readErr.Error()
 		step.Error = &msg
+	} else if int64(len(body)) > maxBodyBytes(req) {
+		msg := fmt.Sprintf("response body exceeds max %d bytes", maxBodyBytes(req))
+		step.Error = &msg
+		body = body[:maxBodyBytes(req)]
+		readErr = fmt.Errorf("%s", msg)
 	}
 
 	step.Timing = adaptTimings(timings, totalWall, end)
@@ -174,7 +179,14 @@ func (e *HTTPExecutor) execute(ctx context.Context, req probe.ProbeRequest, targ
 	}
 
 	var _ probe.RequestExecutor = e
-	return executeResult{step: step, client: client}, nil
+	return executeResult{step: step, client: client}, readErr
+}
+
+func maxBodyBytes(req probe.ProbeRequest) int64 {
+	if req.MaxBodyBytes > 0 {
+		return req.MaxBodyBytes
+	}
+	return 10 << 20 // 10 MiB
 }
 
 func adaptTimings(t *TraceTimings, wall time.Duration, bodyEnd time.Time) probe.Timing {
@@ -198,8 +210,6 @@ func adaptTimings(t *TraceTimings, wall time.Duration, bodyEnd time.Time) probe.
 		tlsMs = ms(t.TLSDone.Sub(t.TLSStart))
 	}
 
-	// TTFB = time from start of request until first response byte.
-	// Prefer GotFirstByte relative to earliest meaningful start.
 	startRef := t.DNSStart
 	if startRef.IsZero() {
 		startRef = t.ConnectStart
@@ -214,7 +224,6 @@ func adaptTimings(t *TraceTimings, wall time.Duration, bodyEnd time.Time) probe.
 		estimated = true
 	}
 
-	// Wait = server processing after request written until first byte.
 	if !t.WroteRequest.IsZero() && !t.GotFirstByte.IsZero() {
 		wait = ms(t.GotFirstByte.Sub(t.WroteRequest))
 	} else if !t.GotConn.IsZero() && !t.GotFirstByte.IsZero() {
