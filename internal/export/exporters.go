@@ -38,65 +38,9 @@ func Factory(mode string, w io.Writer, jsonPath string) (probe.Exporter, error) 
 	}
 }
 
-// WaterfallExporter prints a phase table (Strategy).
+// WaterfallExporter prints a phase timeline (rich when stdout is a TTY).
 type WaterfallExporter struct {
 	W io.Writer
-}
-
-func (e *WaterfallExporter) Export(report probe.ProbeReport) error {
-	for _, step := range report.Steps {
-		fmt.Fprintf(e.W, "\n── Step %d: %s ──\n", step.StepNumber, step.URL)
-		if step.Error != nil {
-			fmt.Fprintf(e.W, "  error: %s\n", *step.Error)
-		}
-		t := step.Timing
-		printBar(e.W, "DNS", t.DNSMS, t.TotalMS)
-		printBar(e.W, "Connect", t.ConnectMS, t.TotalMS)
-		printBar(e.W, "TLS", t.TLSMS, t.TotalMS)
-		printBar(e.W, "Wait", t.WaitMS, t.TotalMS)
-		printBar(e.W, "Transfer", t.XferMS, t.TotalMS)
-		fmt.Fprintf(e.W, "  %-10s %8.1f ms  (ttfb=%.1f)\n", "Total", t.TotalMS, t.TTFBMS)
-		if step.Response != nil {
-			fmt.Fprintf(e.W, "  status=%d bytes=%d", step.Response.Status, step.Response.Bytes)
-		}
-		if step.Network.IP != "" {
-			fmt.Fprintf(e.W, " ip=%s (%s)", step.Network.IP, step.Network.IPFamily)
-		}
-		if step.Network.TLSVersion != "" {
-			fmt.Fprintf(e.W, " %s %s", step.Network.TLSVersion, step.Network.TLSCipher)
-		}
-		fmt.Fprintln(e.W)
-	}
-	fmt.Fprintf(e.W, "\nSummary: steps=%d total=%.1f ms final_status=%d final_url=%s\n",
-		report.TotalSteps, report.Summary.TotalTimeMS, report.Summary.FinalStatus, report.Summary.FinalURL)
-	if report.Summary.SLO != nil {
-		if report.Summary.SLO.Pass {
-			fmt.Fprintln(e.W, "SLO: pass")
-		} else {
-			fmt.Fprintln(e.W, "SLO: FAIL")
-			for _, v := range report.Summary.SLO.Violations {
-				fmt.Fprintf(e.W, "  %s: actual=%.1f threshold=%.1f delta=+%.1f\n",
-					v.Key, v.ActualMS, v.ThresholdMS, v.DeltaMS)
-			}
-		}
-	}
-	return nil
-}
-
-func printBar(w io.Writer, label string, ms, total float64) {
-	width := 40
-	n := 0
-	if total > 0 {
-		n = int(ms / total * float64(width))
-	}
-	if n > width {
-		n = width
-	}
-	if ms > 0 && n == 0 {
-		n = 1
-	}
-	bar := strings.Repeat("█", n) + strings.Repeat("░", width-n)
-	fmt.Fprintf(w, "  %-10s %8.1f ms  |%s|\n", label, ms, bar)
 }
 
 // CompactExporter prints one line per step.

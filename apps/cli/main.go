@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -19,6 +20,13 @@ import (
 
 func main() {
 	var f probeFlags
+	verbose := false
+
+	// Quiet by default so the waterfall stays readable.
+	platform.SetLogLevel(slog.LevelWarn)
+	if os.Getenv("HOPTRACE_VERBOSE") == "1" {
+		platform.SetLogLevel(slog.LevelInfo)
+	}
 
 	root := &cobra.Command{
 		Use:   "hoptrace [url]",
@@ -32,6 +40,11 @@ Examples:
   hoptrace saved list
   hoptrace history`,
 		Args: cobra.MaximumNArgs(1),
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+			if verbose {
+				platform.SetLogLevel(slog.LevelInfo)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()
@@ -41,6 +54,7 @@ Examples:
 		},
 	}
 
+	root.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show probe debug logs on stderr")
 	bindProbeFlags(root, &f)
 
 	root.AddCommand(&cobra.Command{
@@ -69,6 +83,7 @@ Examples:
 	root.AddCommand(newScheduleCmd())
 	root.AddCommand(newKeysCmd())
 	root.AddCommand(newBaselineCmd())
+	root.AddCommand(newDashboardCmd())
 
 	root.SilenceUsage = true
 	if err := root.Execute(); err != nil {

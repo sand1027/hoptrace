@@ -44,8 +44,13 @@ hoptrace 'https://httpbin.io/get'
 hoptrace save demo https://httpbin.io/get
 hoptrace run demo
 hoptrace history
+hoptrace dashboard          # opens http://127.0.0.1:3000
 hoptrace --slo total=500 'https://httpbin.io/get'
 ```
+
+Start the dashboard stack with `make dev`, then `hoptrace dashboard` opens it in your browser.
+TTY waterfall uses color phase bars (auto on interactive terminals).  
+Force on: `HOPTRACE_COLOR=1` · force off: `NO_COLOR=1`. Add `-v` for probe debug logs.
 
 ### Exit codes (scripting)
 
