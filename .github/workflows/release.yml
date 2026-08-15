@@ -18,13 +18,15 @@ jobs:
 
       - name: Build binaries
         run: |
+          VERSION="${GITHUB_REF_NAME}"
+          LDFLAGS="-s -w -X github.com/sandeepv/hoptrace/internal/version.Version=${VERSION}"
           mkdir -p dist
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/hoptrace_darwin_arm64 ./apps/cli
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/hoptrace_darwin_amd64 ./apps/cli
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/hoptrace_linux_amd64 ./apps/cli
-          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/hoptrace_linux_arm64 ./apps/cli
-          cp openapi.yaml dist/
-          cd dist && sha256sum hoptrace_* openapi.yaml > checksums.txt
+          GOOS=darwin GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/hoptrace_darwin_arm64 ./apps/cli
+          GOOS=darwin GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/hoptrace_darwin_amd64 ./apps/cli
+          GOOS=linux GOARCH=amd64 go build -ldflags="$LDFLAGS" -o dist/hoptrace_linux_amd64 ./apps/cli
+          GOOS=linux GOARCH=arm64 go build -ldflags="$LDFLAGS" -o dist/hoptrace_linux_arm64 ./apps/cli
+          cp openapi.yaml LICENSE SECURITY.md dist/
+          cd dist && sha256sum hoptrace_* openapi.yaml LICENSE SECURITY.md > checksums.txt
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -35,5 +37,7 @@ jobs:
             dist/hoptrace_linux_amd64
             dist/hoptrace_linux_arm64
             dist/openapi.yaml
+            dist/LICENSE
+            dist/SECURITY.md
             dist/checksums.txt
           generate_release_notes: true

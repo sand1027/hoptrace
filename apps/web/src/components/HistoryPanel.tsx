@@ -28,7 +28,7 @@ export function HistoryPanel({
       </div>
       {loading && <div className={styles.empty}>Loading…</div>}
       {!loading && items.length === 0 && (
-        <div className={styles.empty}>No saved probes yet.</div>
+        <div className={styles.empty}>No history yet.</div>
       )}
       <ul className={styles.list}>
         {items.map((item) => {

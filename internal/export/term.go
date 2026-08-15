@@ -106,6 +106,12 @@ func (e *WaterfallExporter) exportRich(report probe.ProbeReport) error {
 				meta = append(meta, muted.Render(shortCipher(step.Network.TLSCipher)))
 			}
 		}
+		if step.Network.HTTPVersion != "" {
+			meta = append(meta, muted.Render(step.Network.HTTPVersion))
+		}
+		if step.Timing.IsEstimated {
+			meta = append(meta, muted.Render("estimated"))
+		}
 		if len(meta) > 0 {
 			fmt.Fprintln(e.W, "  "+strings.Join(meta, muted.Render(" · ")))
 		}

@@ -21,8 +21,8 @@ No `DATABASE_URL`, Docker, or API keys required. History lives in `~/.hoptrace/h
 - **Baselines:** `hoptrace baseline 'https://example.com'`
 - **API keys:** optional — only with `-require-auth` / hosted API
 - **Alerts:** pass `webhook_url` / `slack_webhook` on probe or schedule
-- **Share:** `POST /v1/probes/{id}/share`
-- **Postgres:** optional adapter for future hosted deploys (`DATABASE_URL`) — **not used locally**
+- **Share:** dashboard **Copy share link** → `/share/{token}` (API `POST /v1/probes/{id}/share`)
+- **Postgres:** stub adapter only — **not wired** into `apps/api` (local = SQLite)
 - **OpenAPI:** [openapi.yaml](../openapi.yaml)
 
 ## SBOM / release
