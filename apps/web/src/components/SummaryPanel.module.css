@@ -1,9 +1,12 @@
 .panel {
+  background: var(--bg-elev);
   border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  border-radius: var(--radius);
   padding: 1rem 1.1rem;
   display: grid;
   gap: 1rem;
+  box-shadow: var(--shadow);
+  animation: ht-rise 360ms ease both;
 }
 
 .stats {
@@ -15,18 +18,22 @@
 .stat {
   display: grid;
   gap: 0.2rem;
-  font-family: var(--font-plex-mono), monospace;
+  padding: 0.65rem 0.7rem;
+  background: var(--bg);
+  border-radius: 8px;
 }
 
 .stat span {
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--muted);
+  font-weight: 600;
 }
 
 .stat strong {
-  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--ink);
 }
@@ -34,7 +41,7 @@
 .details {
   display: grid;
   gap: 0.45rem;
-  font-family: var(--font-plex-mono), monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
 }
 
@@ -42,10 +49,21 @@
   display: grid;
   grid-template-columns: 90px 1fr;
   gap: 0.5rem;
+  align-items: baseline;
 }
 
 .k {
   color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  font-family: var(--font-body);
+}
+
+.details code {
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
 }
 
 .sloPass code {
@@ -60,15 +78,16 @@
   justify-self: start;
   background: transparent;
   border: 1px solid var(--line);
-  color: var(--ink);
-  padding: 0.55rem 0.85rem;
+  color: var(--ink-2);
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
   cursor: pointer;
-  font-family: var(--font-plex-mono), monospace;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .download:hover {
-  border-color: var(--accent-dim);
+  border-color: var(--accent);
   color: var(--accent);
 }
 

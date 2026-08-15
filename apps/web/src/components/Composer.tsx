@@ -1,21 +1,58 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import type { ProbeAPIRequest } from "@hoptrace/shared-types";
 import styles from "./Composer.module.css";
 
-type Props = {
-  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
-  loading: boolean;
+export type ComposerDraft = {
+  url: string;
+  method: string;
+  follow: boolean;
+  body: string;
+  headersText: string;
+  slo: string;
+  timeoutMs: number;
 };
 
-export function Composer({ onSubmit, loading }: Props) {
-  const [url, setUrl] = useState("https://httpbin.io/get");
-  const [method, setMethod] = useState("GET");
-  const [follow, setFollow] = useState(false);
-  const [body, setBody] = useState("");
-  const [headersText, setHeadersText] = useState("");
-  const [slo, setSlo] = useState("");
-  const [timeoutMs, setTimeoutMs] = useState(30000);
+type Props = {
+  onSubmit: (payload: ProbeAPIRequest, opts: { live: boolean }) => Promise<void>;
+  loading: boolean;
+  draft?: ComposerDraft | null;
+  liveStatus?: string | null;
+};
+
+const defaults: ComposerDraft = {
+  url: "https://httpbin.io/get",
+  method: "GET",
+  follow: false,
+  body: "",
+  headersText: "",
+  slo: "",
+  timeoutMs: 30000,
+};
+
+export function Composer({ onSubmit, loading, draft, liveStatus }: Props) {
+  const [url, setUrl] = useState(defaults.url);
+  const [method, setMethod] = useState(defaults.method);
+  const [follow, setFollow] = useState(defaults.follow);
+  const [body, setBody] = useState(defaults.body);
+  const [headersText, setHeadersText] = useState(defaults.headersText);
+  const [slo, setSlo] = useState(defaults.slo);
+  const [timeoutMs, setTimeoutMs] = useState(defaults.timeoutMs);
+  const [live, setLive] = useState(true);
+  const [advanced, setAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (!draft) return;
+    setUrl(draft.url);
+    setMethod(draft.method);
+    setFollow(draft.follow);
+    setBody(draft.body);
+    setHeadersText(draft.headersText);
+    setSlo(draft.slo);
+    setTimeoutMs(draft.timeoutMs);
+    setAdvanced(true);
+  }, [draft]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,103 +73,141 @@ export function Composer({ onSubmit, loading }: Props) {
       }
     }
 
-    await onSubmit({
-      url,
-      method,
-      headers,
-      body: body || undefined,
-      follow_redirects: follow,
-      timeout_ms: timeoutMs,
-      slo: Object.keys(sloMap).length ? sloMap : undefined,
-    });
+    await onSubmit(
+      {
+        url,
+        method,
+        headers,
+        body: body || undefined,
+        follow_redirects: follow,
+        timeout_ms: timeoutMs,
+        slo: Object.keys(sloMap).length ? sloMap : undefined,
+      },
+      { live }
+    );
   }
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      <label className={styles.label}>
-        URL
+      <div className={styles.bar}>
+        <select
+          className={styles.method}
+          value={method}
+          onChange={(e) => setMethod(e.target.value)}
+          aria-label="HTTP method"
+        >
+          {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map(
+            (m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            )
+          )}
+        </select>
         <input
-          className={styles.input}
+          className={styles.url}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com"
           required
+          spellCheck={false}
         />
-      </label>
-
-      <div className={styles.row}>
-        <label className={styles.label}>
-          Method
-          <select
-            className={styles.input}
-            value={method}
-            onChange={(e) => setMethod(e.target.value)}
-          >
-            {["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"].map(
-              (m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              )
-            )}
-          </select>
-        </label>
-        <label className={styles.label}>
-          Timeout (ms)
-          <input
-            className={styles.input}
-            type="number"
-            min={1000}
-            value={timeoutMs}
-            onChange={(e) => setTimeoutMs(Number(e.target.value))}
-          />
-        </label>
+        <button className={styles.cta} type="submit" disabled={loading}>
+          {loading ? "Running…" : "Run"}
+        </button>
       </div>
 
-      <label className={styles.check}>
-        <input
-          type="checkbox"
-          checked={follow}
-          onChange={(e) => setFollow(e.target.checked)}
-        />
-        Follow redirects
-      </label>
+      <div className={styles.toolbar}>
+        <label className={styles.toggle}>
+          <input
+            type="checkbox"
+            checked={live}
+            onChange={(e) => setLive(e.target.checked)}
+          />
+          Live stream
+        </label>
+        <label className={styles.toggle}>
+          <input
+            type="checkbox"
+            checked={follow}
+            onChange={(e) => setFollow(e.target.checked)}
+          />
+          Follow redirects
+        </label>
+        <button
+          type="button"
+          className={styles.advBtn}
+          onClick={() => setAdvanced((v) => !v)}
+          aria-expanded={advanced}
+        >
+          {advanced ? "Hide options" : "Options"}
+        </button>
+        {liveStatus && <span className={styles.live}>{liveStatus}</span>}
+      </div>
 
-      <label className={styles.label}>
-        Headers (one Key: Value per line)
-        <textarea
-          className={styles.textarea}
-          rows={3}
-          value={headersText}
-          onChange={(e) => setHeadersText(e.target.value)}
-          placeholder={"Accept: application/json"}
-        />
-      </label>
-
-      <label className={styles.label}>
-        Body
-        <textarea
-          className={styles.textarea}
-          rows={3}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder='{"hello":"world"}'
-        />
-      </label>
-
-      <label className={styles.label}>
-        SLO (optional)
-        <input
-          className={styles.input}
-          value={slo}
-          onChange={(e) => setSlo(e.target.value)}
-          placeholder="total=2000,ttfb=800"
-        />
-      </label>
-
-      <button className={styles.cta} type="submit" disabled={loading}>
-        {loading ? "Running…" : "Run probe"}
-      </button>
+      {advanced && (
+        <div className={styles.advanced}>
+          <label className={styles.label}>
+            Headers
+            <textarea
+              className={styles.textarea}
+              rows={3}
+              value={headersText}
+              onChange={(e) => setHeadersText(e.target.value)}
+              placeholder={"Accept: application/json"}
+            />
+          </label>
+          <label className={styles.label}>
+            Body
+            <textarea
+              className={styles.textarea}
+              rows={3}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder='{"hello":"world"}'
+            />
+          </label>
+          <div className={styles.row}>
+            <label className={styles.label}>
+              Timeout (ms)
+              <input
+                className={styles.input}
+                type="number"
+                min={1000}
+                value={timeoutMs}
+                onChange={(e) => setTimeoutMs(Number(e.target.value))}
+              />
+            </label>
+            <label className={styles.label}>
+              SLO
+              <input
+                className={styles.input}
+                value={slo}
+                onChange={(e) => setSlo(e.target.value)}
+                placeholder="total=2000,ttfb=800"
+              />
+            </label>
+          </div>
+        </div>
+      )}
     </form>
   );
+}
+
+export function payloadToDraft(p: ProbeAPIRequest): ComposerDraft {
+  const headersText = Object.entries(p.headers || {})
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+  const slo = Object.entries(p.slo || {})
+    .map(([k, v]) => `${k}=${v}`)
+    .join(",");
+  return {
+    url: p.url,
+    method: p.method || "GET",
+    follow: !!p.follow_redirects,
+    body: p.body || "",
+    headersText,
+    slo,
+    timeoutMs: p.timeout_ms || 30000,
+  };
 }

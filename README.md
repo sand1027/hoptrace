@@ -1,42 +1,87 @@
 # Hoptrace
 
-HTTP latency profiler that breaks each request into **DNS → Connect → TLS → Wait → Transfer** phases.
+HTTP latency profiler — break every request into **DNS → Connect → TLS → Wait → Transfer**.
 
-Shared Go probe engine powers:
-- **CLI** (`apps/cli`) — curl-like terminal tool
-- **API** (`apps/api`) — JSON HTTP API
-- **Web** (`apps/web`) — Next.js waterfall UI
+| Surface | Use |
+|---------|-----|
+| **CLI** | Fast local probes (`hoptrace <url>`) |
+| **Dashboard** | Compose/send requests, waterfall, history, library |
 
-## Quick start
+**Local store: SQLite** (`~/.hoptrace/history.db`). No Postgres, Docker, or API keys required to try it.
+
+## Clone and run (local dashboard)
 
 ```bash
-# Install JS deps
+git clone <repo> && cd hoptrace
 pnpm install
-
-# Run API (port 8080)
-make api
-
-# Run CLI probe (quote URLs that contain &)
-make cli URL='https://httpbin.io/get'
-make cli URL='https://example.com/path?a=1&b=2' FLAGS='--metrics-only'
-
-# Or call go directly
-go run ./apps/cli 'https://httpbin.io/get'
-go run ./apps/cli --follow 'https://httpbin.io/redirect/2'
-
-# Run web UI (port 3000, proxies /api → :8080)
-make web
+make install          # CLI → ~/.local/bin/hoptrace
+make dev              # API :8080 + dashboard :3000
 ```
 
-## Architecture
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000) — send a request, watch the waterfall, browse history.
 
-See [architecture/](architecture/) for Mermaid sources and PNG diagrams.
-Design pattern explainers live in [docs/patterns/](docs/patterns/).
+Or run pieces separately:
 
-## Roadmap
+```bash
+make api              # :8080 (SQLite, no auth)
+make web              # :3000
+```
 
-v1 core probe → v2 history → v3 saved probes → v4 live stream → v5 schedules →
-v6 auth → v7 alerting → v8 plugins → v9 scale/polish.
+## Install CLI only
+
+```bash
+go install github.com/sandeepv/hoptrace/apps/cli@latest   # after push
+# or from a clone:
+make install
+```
+
+Tagged releases (`v*`) publish cross-compiled binaries via GitHub Actions. Locally: `make release` → `dist/`.
+
+## CLI
+
+```bash
+hoptrace 'https://httpbin.io/get'
+hoptrace save demo https://httpbin.io/get
+hoptrace run demo
+hoptrace history
+hoptrace --slo total=500 'https://httpbin.io/get'
+```
+
+### Exit codes (scripting)
+
+| Code | Meaning |
+|------|---------|
+| `0` | OK |
+| `4` | SLO failed |
+| `64` | Usage / bad flags |
+| `70` | Software error |
+| `75` | Probe / network failure |
+
+CLI and dashboard share the same probe engine and SQLite history.
+
+## Storage
+
+| Mode | Store |
+|------|--------|
+| **Local (default)** | SQLite — zero setup |
+| Hosted / scale later | Postgres adapter exists (`DATABASE_URL`) but is **optional** and not needed for clone-and-run |
+
+## Develop
+
+```bash
+make test             # go test ./...
+pnpm --filter @hoptrace/web typecheck
+```
+
+CI runs both on every PR (`.github/workflows/ci.yml`).
+
+## Docs
+
+- [architecture/](architecture/) — diagrams
+- [docs/patterns/](docs/patterns/) — design patterns
+- [openapi.yaml](openapi.yaml) — API contract
+- [docs/RELEASE.md](docs/RELEASE.md) — release notes
+- [ROADMAP.md](ROADMAP.md)
 
 ## License
 

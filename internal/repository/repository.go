@@ -22,7 +22,7 @@ type ProbeRepository interface {
 	List(ctx context.Context, limit int) ([]ProbeRecord, error)
 }
 
-// MemoryRepository is an in-memory Adapter used until SQLite lands in v2.
+// MemoryRepository is an in-memory Adapter (tests / ephemeral mode).
 type MemoryRepository struct {
 	mu      sync.RWMutex
 	records []ProbeRecord

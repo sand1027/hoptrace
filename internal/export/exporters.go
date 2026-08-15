@@ -7,15 +7,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/sandeepv/hoptrace/internal/plugin"
 	"github.com/sandeepv/hoptrace/internal/probe"
 )
 
-// Factory creates an Exporter from a mode name (Factory pattern).
+// Factory creates an Exporter from a mode name (Factory pattern + plugin registry).
 func Factory(mode string, w io.Writer, jsonPath string) (probe.Exporter, error) {
 	if w == nil {
 		w = os.Stdout
 	}
-	switch strings.ToLower(mode) {
+	mode = strings.ToLower(mode)
+	if f, ok := plugin.LookupExporter(mode); ok {
+		return f(), nil
+	}
+	switch mode {
 	case "", "waterfall", "rich":
 		return &WaterfallExporter{W: w}, nil
 	case "compact":
@@ -24,10 +29,12 @@ func Factory(mode string, w io.Writer, jsonPath string) (probe.Exporter, error) 
 		return &MetricsExporter{W: w}, nil
 	case "json":
 		return &JSONExporter{Path: jsonPath, W: w}, nil
+	case "jsonl":
+		return &JSONLExporter{W: w}, nil
 	case "noop":
 		return probe.NoopExporter{}, nil
 	default:
-		return nil, fmt.Errorf("unknown export mode: %s", mode)
+		return nil, fmt.Errorf("unknown export mode: %s (registered: %v)", mode, plugin.ListExporters())
 	}
 }
 

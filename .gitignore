@@ -33,3 +33,8 @@ npm-debug.log*
 
 # Generated
 packages/shared-types/src/generated/
+
+# Local notes
+plan.md
+httptap_monorepo_plan_d1630868.plan.md
+ROADMAP.md

@@ -1,0 +1,146 @@
+openapi: 3.0.3
+info:
+  title: Hoptrace API
+  version: 9.0.0
+  description: HTTP phase profiler — probes, history, saved templates, schedules, auth, alerts
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /v1/health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /v1/probes:
+    get:
+      summary: List probe history
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Probe records
+    post:
+      summary: Run a probe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProbeRequest"
+      responses:
+        "200":
+          description: Probe report
+  /v1/probes/stream:
+    get:
+      summary: WebSocket live probe stream
+      responses:
+        "101":
+          description: Switching Protocols
+  /v1/probes/{id}:
+    get:
+      summary: Get probe by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Probe record
+  /v1/probes/{id}/share:
+    post:
+      summary: Create shareable link token
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Share token
+  /v1/share/{token}:
+    get:
+      summary: Public shared probe
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Probe record
+  /v1/saved:
+    get:
+      summary: List saved templates
+      responses:
+        "200":
+          description: Saved probes
+    post:
+      summary: Upsert saved template
+      responses:
+        "200":
+          description: Saved probe
+  /v1/schedules:
+    get:
+      summary: List schedules
+      responses:
+        "200":
+          description: Jobs
+    post:
+      summary: Create/update schedule
+      responses:
+        "200":
+          description: Job
+  /v1/baselines:
+    get:
+      summary: p50/p95 baseline for URL
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Baseline stats
+  /v1/failures:
+    get:
+      summary: Recent SLO/error failures
+      responses:
+        "200":
+          description: Failures
+  /v1/keys:
+    get:
+      summary: List API keys (metadata)
+      responses:
+        "200":
+          description: Keys
+    post:
+      summary: Create API key
+      responses:
+        "200":
+          description: Key plaintext (once)
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    ProbeRequest:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        method: { type: string }
+        headers: { type: object }
+        body: { type: string }
+        follow_redirects: { type: boolean }
+        timeout_ms: { type: integer }
+        slo: { type: object }
+        webhook_url: { type: string }
+        slack_webhook: { type: string }
+security:
+  - ApiKeyAuth: []

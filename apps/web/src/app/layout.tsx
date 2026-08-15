@@ -1,30 +1,42 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { JetBrains_Mono, Source_Sans_3, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const plexSans = IBM_Plex_Sans({
+const space = Space_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-sans",
+  weight: ["500", "600", "700"],
+  variable: "--font-space",
 });
 
-const plexMono = IBM_Plex_Mono({
+const source = Source_Sans_3({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-source",
+});
+
+const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  variable: "--font-jb",
 });
 
 export const metadata: Metadata = {
-  title: "Hoptrace — HTTP phase profiler",
-  description: "Break HTTP requests into DNS, connect, TLS, wait, and transfer",
+  title: "hoptrace — HTTP phase profiler",
+  description:
+    "Dissect every hop: DNS, connect, TLS, wait, and transfer.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
-      <body style={{ fontFamily: "var(--font-plex-sans), var(--font-body)" }}>
-        {children}
-      </body>
+    <html
+      lang="en"
+      className={`${space.variable} ${source.variable} ${mono.variable}`}
+    >
+      <body>{children}</body>
     </html>
   );
 }

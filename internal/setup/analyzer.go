@@ -8,8 +8,10 @@ import (
 
 // DefaultAnalyzer wires production strategies (Factory convenience).
 // Lives outside probe/ to avoid import cycles with executor.
-func DefaultAnalyzer() *probe.Analyzer {
+func DefaultAnalyzer(opts ...probe.Option) *probe.Analyzer {
 	inner := executor.NewHTTPExecutor()
 	decorated := executor.NewLoggingExecutor(inner, platform.Logger())
-	return probe.NewAnalyzer(probe.WithExecutor(decorated))
+	base := []probe.Option{probe.WithExecutor(decorated)}
+	base = append(base, opts...)
+	return probe.NewAnalyzer(base...)
 }

@@ -1,0 +1,39 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/hoptrace_darwin_arm64 ./apps/cli
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/hoptrace_darwin_amd64 ./apps/cli
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/hoptrace_linux_amd64 ./apps/cli
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/hoptrace_linux_arm64 ./apps/cli
+          cp openapi.yaml dist/
+          cd dist && sha256sum hoptrace_* openapi.yaml > checksums.txt
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/hoptrace_darwin_arm64
+            dist/hoptrace_darwin_amd64
+            dist/hoptrace_linux_amd64
+            dist/hoptrace_linux_arm64
+            dist/openapi.yaml
+            dist/checksums.txt
+          generate_release_notes: true

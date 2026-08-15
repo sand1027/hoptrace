@@ -12,6 +12,8 @@ type Analyzer struct {
 	DNS      DNSResolver
 	Executor RequestExecutor
 	SLO      *SLOEvaluator
+	Events   EventListener
+	// Listener is legacy; prefer Events. Kept for WithListener.
 	Listener PhaseListener
 }
 
@@ -30,11 +32,16 @@ func WithListener(l PhaseListener) Option {
 	return func(a *Analyzer) { a.Listener = l }
 }
 
+func WithEvents(l EventListener) Option {
+	return func(a *Analyzer) { a.Events = l }
+}
+
 // NewAnalyzer constructs a configured Analyzer (Factory).
 func NewAnalyzer(opts ...Option) *Analyzer {
 	a := &Analyzer{
 		SLO:      NewSLOEvaluator(),
 		Listener: NoopListener{},
+		Events:   NoopEventListener{},
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -42,10 +49,21 @@ func NewAnalyzer(opts ...Option) *Analyzer {
 	return a
 }
 
+func (a *Analyzer) emit(e Event) {
+	listeners := []EventListener{a.Events}
+	if a.Listener != nil {
+		listeners = append(listeners, PhaseBridge{Inner: a.Listener})
+	}
+	NewMultiListener(listeners...).OnEvent(e)
+}
+
 // Analyze runs the full probe including optional redirect following (Template Method skeleton).
 func (a *Analyzer) Analyze(ctx context.Context, req ProbeRequest) (ProbeReport, error) {
 	if a.Executor == nil {
 		return ProbeReport{}, fmt.Errorf("analyzer: executor is required")
+	}
+	if a.Events == nil {
+		a.Events = NoopEventListener{}
 	}
 	if a.Listener == nil {
 		a.Listener = NoopListener{}
@@ -74,10 +92,13 @@ func (a *Analyzer) Analyze(ctx context.Context, req ProbeRequest) (ProbeReport, 
 		stepReq.Body = body
 		stepReq.URL = currentURL
 
+		a.emit(Event{Kind: "step_start", Step: hop, URL: currentURL})
 		step, err := a.doStep(ctx, stepReq, currentURL, hop)
 		report.Steps = append(report.Steps, step)
+		a.emit(Event{Kind: "step_done", Step: hop, URL: currentURL, Result: &step})
 		if err != nil {
 			lastErr = err
+			a.emit(Event{Kind: "error", Step: hop, URL: currentURL, Error: err.Error()})
 			break
 		}
 
@@ -99,17 +120,34 @@ func (a *Analyzer) Analyze(ctx context.Context, req ProbeRequest) (ProbeReport, 
 
 	report.TotalSteps = len(report.Steps)
 	report.Summary = a.buildSummary(report, req.SLO)
+	a.emit(Event{Kind: "done", Report: &report, Error: errString(lastErr)})
 	return report, lastErr
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func (a *Analyzer) doStep(ctx context.Context, req ProbeRequest, targetURL string, stepNum int) (StepResult, error) {
 	step, err := a.Executor.Execute(ctx, req, targetURL)
 	step.StepNumber = stepNum
-	a.Listener.OnPhase("total", stepNum, step.Timing.TotalMS)
-	a.Listener.OnPhase("dns", stepNum, step.Timing.DNSMS)
-	a.Listener.OnPhase("connect", stepNum, step.Timing.ConnectMS)
-	a.Listener.OnPhase("tls", stepNum, step.Timing.TLSMS)
-	a.Listener.OnPhase("ttfb", stepNum, step.Timing.TTFBMS)
+	for _, p := range []struct {
+		name string
+		ms   float64
+	}{
+		{"dns", step.Timing.DNSMS},
+		{"connect", step.Timing.ConnectMS},
+		{"tls", step.Timing.TLSMS},
+		{"wait", step.Timing.WaitMS},
+		{"xfer", step.Timing.XferMS},
+		{"ttfb", step.Timing.TTFBMS},
+		{"total", step.Timing.TotalMS},
+	} {
+		a.emit(Event{Kind: "phase", Step: stepNum, Phase: p.name, MS: p.ms, URL: targetURL})
+	}
 	return step, err
 }
 
