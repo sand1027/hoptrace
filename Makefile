@@ -19,21 +19,21 @@ cli:
 	go run ./apps/cli $(FLAGS) "$(URL)"
 
 install:
-	go build -o bin/hoptrace ./apps/cli
+	go build -ldflags="-s -w -X github.com/sandeepv/hoptrace/internal/version.Version=$(VERSION)" -o bin/hoptrace ./apps/cli
 	go build -o bin/hoptrace-api ./apps/api
 	mkdir -p "$(HOME)/.local/bin"
 	ln -sf "$(CURDIR)/bin/hoptrace" "$(HOME)/.local/bin/hoptrace"
-	@echo "Installed: $(HOME)/.local/bin/hoptrace"
+	@echo "Installed: $(HOME)/.local/bin/hoptrace ($(VERSION))"
 	@echo "Try: hoptrace version"
 
 # Cross-compile CLI binaries into dist/ (also published on git tag v*).
 release:
 	mkdir -p dist
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/hoptrace_darwin_arm64 ./apps/cli
-	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/hoptrace_darwin_amd64 ./apps/cli
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/hoptrace_linux_amd64 ./apps/cli
-	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/hoptrace_linux_arm64 ./apps/cli
-	cp openapi.yaml dist/
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X github.com/sandeepv/hoptrace/internal/version.Version=$(VERSION)" -o dist/hoptrace_darwin_arm64 ./apps/cli
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X github.com/sandeepv/hoptrace/internal/version.Version=$(VERSION)" -o dist/hoptrace_darwin_amd64 ./apps/cli
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X github.com/sandeepv/hoptrace/internal/version.Version=$(VERSION)" -o dist/hoptrace_linux_amd64 ./apps/cli
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X github.com/sandeepv/hoptrace/internal/version.Version=$(VERSION)" -o dist/hoptrace_linux_arm64 ./apps/cli
+	cp openapi.yaml LICENSE SECURITY.md dist/
 	@echo "Built $(VERSION) → dist/"
 
 web:

@@ -36,6 +36,9 @@ func main() {
 	flag.Parse()
 
 	logger := platform.Logger()
+	if os.Getenv("DATABASE_URL") != "" {
+		logger.Warn("DATABASE_URL is set, but the API uses SQLite locally; Postgres adapter is not wired for full dashboard features yet")
+	}
 	path := *dbPath
 	if path == "" {
 		var err error

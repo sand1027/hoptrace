@@ -5,7 +5,7 @@ HTTP latency profiler — break every request into **DNS → Connect → TLS →
 | Surface | Use |
 |---------|-----|
 | **CLI** | Fast local probes (`hoptrace <url>`) |
-| **Dashboard** | Compose/send requests, waterfall, history, library |
+| **Dashboard** | Compose/send requests, waterfall, history, library, share links |
 
 **Local store: SQLite** (`~/.hoptrace/history.db`). No Postgres, Docker, or API keys required to try it.
 
@@ -16,9 +16,10 @@ git clone <repo> && cd hoptrace
 pnpm install
 make install          # CLI → ~/.local/bin/hoptrace
 make dev              # API :8080 + dashboard :3000
+hoptrace dashboard    # opens the UI
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000) — send a request, watch the waterfall, browse history.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000) — send a request, watch the waterfall, browse history, copy a share link.
 
 Or run pieces separately:
 
@@ -30,10 +31,12 @@ make web              # :3000
 ## Install CLI only
 
 ```bash
-go install github.com/sandeepv/hoptrace/apps/cli@latest   # after push
-# or from a clone:
 make install
+# or after publish:
+go install github.com/sandeepv/hoptrace/apps/cli@latest
 ```
+
+Shell completions: `hoptrace completion zsh` (also bash/fish/powershell).
 
 Tagged releases (`v*`) publish cross-compiled binaries via GitHub Actions. Locally: `make release` → `dist/`.
 
@@ -48,7 +51,6 @@ hoptrace dashboard          # opens http://127.0.0.1:3000
 hoptrace --slo total=500 'https://httpbin.io/get'
 ```
 
-Start the dashboard stack with `make dev`, then `hoptrace dashboard` opens it in your browser.
 TTY waterfall uses color phase bars (auto on interactive terminals).  
 Force on: `HOPTRACE_COLOR=1` · force off: `NO_COLOR=1`. Add `-v` for probe debug logs.
 
@@ -68,8 +70,8 @@ CLI and dashboard share the same probe engine and SQLite history.
 
 | Mode | Store |
 |------|--------|
-| **Local (default)** | SQLite — zero setup |
-| Hosted / scale later | Postgres adapter exists (`DATABASE_URL`) but is **optional** and not needed for clone-and-run |
+| **Local (default)** | SQLite — zero setup; powers CLI + dashboard |
+| Postgres | Experimental adapter only (`internal/repository/postgres.go`). **Not wired** into the API yet — ignore `DATABASE_URL` for local use |
 
 ## Develop
 
@@ -86,8 +88,8 @@ CI runs both on every PR (`.github/workflows/ci.yml`).
 - [docs/patterns/](docs/patterns/) — design patterns
 - [openapi.yaml](openapi.yaml) — API contract
 - [docs/RELEASE.md](docs/RELEASE.md) — release notes
-- [ROADMAP.md](ROADMAP.md)
+- [SECURITY.md](SECURITY.md) — reporting & local defaults
 
 ## License
 
-Apache-2.0
+[Apache-2.0](LICENSE)

@@ -16,6 +16,7 @@ import (
 	"github.com/sandeepv/hoptrace/internal/repository"
 	"github.com/sandeepv/hoptrace/internal/setup"
 	"github.com/sandeepv/hoptrace/internal/slo"
+	"github.com/sandeepv/hoptrace/internal/version"
 )
 
 func main() {
@@ -61,9 +62,10 @@ Examples:
 		Use:   "version",
 		Short: "Print version",
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintln(cmd.OutOrStdout(), "hoptrace v9.0.0")
+			fmt.Fprintln(cmd.OutOrStdout(), "hoptrace", version.Version)
 		},
 	})
+	root.AddCommand(newCompletionCmd())
 
 	probeCmd := &cobra.Command{
 		Use:   "probe [url]",

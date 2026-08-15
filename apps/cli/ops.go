@@ -39,6 +39,22 @@ func apiDo(method, path string, body any) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 
+func apiDecode(resp *http.Response, dest any) error {
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errBody map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		if msg, ok := errBody["error"].(string); ok && msg != "" {
+			return fmt.Errorf("api %s: %s", resp.Status, msg)
+		}
+		return fmt.Errorf("api %s", resp.Status)
+	}
+	if dest == nil {
+		return nil
+	}
+	return json.NewDecoder(resp.Body).Decode(dest)
+}
+
 func newScheduleCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "schedule",
@@ -52,9 +68,8 @@ func newScheduleCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 			var jobs []schedule.Job
-			if err := json.NewDecoder(resp.Body).Decode(&jobs); err != nil {
+			if err := apiDecode(resp, &jobs); err != nil {
 				return err
 			}
 			if len(jobs) == 0 {
@@ -86,9 +101,8 @@ func newScheduleCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 			var out schedule.Job
-			if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			if err := apiDecode(resp, &out); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "scheduled %s every %ds\n", out.ID, out.IntervalSec)
@@ -107,7 +121,9 @@ func newScheduleCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
+			if err := apiDecode(resp, nil); err != nil {
+				return err
+			}
 			fmt.Fprintln(cmd.OutOrStdout(), "deleted", args[0])
 			return nil
 		},
@@ -130,9 +146,8 @@ func newKeysCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 			var out map[string]any
-			if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			if err := apiDecode(resp, &out); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "id=%v prefix=%v key=%v\n", out["id"], out["prefix"], out["key"])
@@ -148,9 +163,8 @@ func newKeysCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 			var list []map[string]any
-			if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+			if err := apiDecode(resp, &list); err != nil {
 				return err
 			}
 			for _, k := range list {
@@ -172,9 +186,8 @@ func newBaselineCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			defer resp.Body.Close()
 			var b schedule.BaselineStats
-			if err := json.NewDecoder(resp.Body).Decode(&b); err != nil {
+			if err := apiDecode(resp, &b); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "count=%d p50=%.1f p95=%.1f mean=%.1f last=%.1f regressed=%v %s\n",
@@ -183,4 +196,3 @@ func newBaselineCmd() *cobra.Command {
 		},
 	}
 }
-

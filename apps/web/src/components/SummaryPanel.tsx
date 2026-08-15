@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import type { ProbeReport } from "@hoptrace/shared-types";
+import { apiHeaders } from "@/lib/api";
 import styles from "./SummaryPanel.module.css";
 
 export function SummaryPanel({
@@ -12,6 +14,8 @@ export function SummaryPanel({
 }) {
   const last = report.steps[report.steps.length - 1];
   const slo = report.summary.slo;
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   function downloadJSON() {
     const blob = new Blob([JSON.stringify(report, null, 2)], {
@@ -23,6 +27,32 @@ export function SummaryPanel({
     a.download = `hoptrace-${probeId || "report"}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function shareLink() {
+    if (!probeId) {
+      setShareMsg("Run a probe first to get a shareable link.");
+      return;
+    }
+    setSharing(true);
+    setShareMsg(null);
+    try {
+      const res = await fetch(`/api/v1/probes/${encodeURIComponent(probeId)}/share`, {
+        method: "POST",
+        headers: apiHeaders(),
+      });
+      const data = (await res.json()) as { token?: string; error?: string };
+      if (!res.ok || !data.token) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const link = `${window.location.origin}/share/${data.token}`;
+      await navigator.clipboard.writeText(link);
+      setShareMsg("Share link copied.");
+    } catch (e) {
+      setShareMsg(e instanceof Error ? e.message : "Share failed");
+    } finally {
+      setSharing(false);
+    }
   }
 
   return (
@@ -39,6 +69,12 @@ export function SummaryPanel({
           <span className={styles.k}>Final URL</span>
           <code>{report.summary.final_url}</code>
         </div>
+        {last?.network.http_version && (
+          <div>
+            <span className={styles.k}>HTTP</span>
+            <code>{last.network.http_version}</code>
+          </div>
+        )}
         {last?.network.cert_cn && (
           <div>
             <span className={styles.k}>Cert CN</span>
@@ -48,6 +84,12 @@ export function SummaryPanel({
                 ? ` · ${last.network.cert_days_left}d left`
                 : ""}
             </code>
+          </div>
+        )}
+        {last?.timing.is_estimated && (
+          <div>
+            <span className={styles.k}>Timing</span>
+            <code>estimated (partial trace hooks)</code>
           </div>
         )}
         {slo && (
@@ -64,9 +106,20 @@ export function SummaryPanel({
         )}
       </div>
 
-      <button type="button" className={styles.download} onClick={downloadJSON}>
-        Download JSON
-      </button>
+      <div className={styles.actions}>
+        <button type="button" className={styles.download} onClick={downloadJSON}>
+          Download JSON
+        </button>
+        <button
+          type="button"
+          className={styles.download}
+          onClick={() => void shareLink()}
+          disabled={sharing || !probeId}
+        >
+          {sharing ? "Sharing…" : "Copy share link"}
+        </button>
+      </div>
+      {shareMsg && <p className={styles.shareMsg}>{shareMsg}</p>}
     </div>
   );
 }
